@@ -1,0 +1,32 @@
+name: ETHUSDT free trial
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ethusdt-monitor
+  cancel-in-progress: false
+jobs:
+  monitor:
+    # No private runner job is started. No artifacts/cache or paid models.
+    if: github.event.repository.private == false && vars.MONITOR_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Read closed candles and notify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MONITOR_ENABLED: ${{ vars.MONITOR_ENABLED }}
+          TRIAL_UNTIL: ${{ vars.TRIAL_UNTIL }}
+          BOOTSTRAP_STATE: ${{ vars.BOOTSTRAP_STATE }}
+          AI_ENABLED: 'false'
+        run: python3 monitor.py
