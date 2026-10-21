@@ -237,8 +237,10 @@ def main():
             print('Monitor disabled'); return
         expiry = dt.datetime.fromisoformat(os.environ['TRIAL_UNTIL'].replace('Z', '+00:00'))
         now_local = dt.datetime.now(dt.timezone.utc)
-        if expiry.tzinfo is None or not now_local < expiry <= now_local+dt.timedelta(days=7):
-            raise SafeError('Trial expired or exceeds seven days')
+        if expiry.tzinfo is None or expiry > now_local+dt.timedelta(days=7):
+            raise SafeError('Invalid trial date or exceeds seven days')
+        if expiry <= now_local:
+            print('Trial expired; analysis and notifications stopped'); return
         if not os.getenv('TELEGRAM_BOT_TOKEN') or not os.getenv('TELEGRAM_CHAT_ID'):
             raise SafeError('Configure Telegram Secrets first')
     now, frames = market_frames()
