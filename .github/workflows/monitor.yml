@@ -23,7 +23,7 @@ jobs:
       - name: Read closed candles and notify
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_CRYPTOBLOWER_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MONITOR_ENABLED: ${{ vars.MONITOR_ENABLED }}
           TRIAL_UNTIL: ${{ vars.TRIAL_UNTIL }}
