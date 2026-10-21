@@ -262,6 +262,9 @@ def main():
     if state.get('market', MARKET) != MARKET:
         raise SafeError('State belongs to another market; explicit migration required')
     state['market'] = MARKET
+    state['last_analysis_at'] = dt.datetime.fromtimestamp(now/1000, dt.timezone.utc).isoformat()
+    state['run_id'] = os.getenv('GITHUB_RUN_ID', 'local')
+    state['trigger'] = os.getenv('GITHUB_EVENT_NAME', 'local')
     send = reserve(state, rows[-1]['end'], direction, now)
     store.save(state)  # durable reservation BEFORE Telegram
     if send:
