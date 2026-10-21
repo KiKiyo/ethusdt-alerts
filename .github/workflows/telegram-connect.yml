@@ -1,0 +1,20 @@
+name: Telegram private connection test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: telegram-setup
+  cancel-in-progress: false
+jobs:
+  connect:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: python3 telegram_connect.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_CRYPTOBLOWER_TOKEN }}
