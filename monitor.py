@@ -92,6 +92,43 @@ def signal(a, b):
     return '观察'
 
 
+def entry_signal(minute, five, fifteen):
+    direction = signal(five, fifteen)
+    # Retain trend filters; require current closed 1m momentum and fresh volume.
+    if minute['volume_ratio'] < 1.2:
+        return '观察'
+    if direction == '偏多' and (minute['close'] > minute['ema9'] > minute['ema21']
+                                  and 50 <= minute['rsi'] <= 68):
+        return direction
+    if direction == '偏空' and (minute['close'] < minute['ema9'] < minute['ema21']
+                                  and 32 <= minute['rsi'] <= 50):
+        return direction
+    return '观察'
+
+
+class LocalState:
+    """Private durable state; runner.py holds the process lock."""
+    def __init__(self):
+        self.path = Path(os.getenv('STATE_FILE', 'runtime/state.json'))
+
+    def load(self):
+        if not self.path.exists():
+            if os.getenv('BOOTSTRAP_STATE') != 'true':
+                raise SafeError('Missing local state; explicit bootstrap required')
+            return {}
+        return json.loads(self.path.read_text())
+
+    def save(self, state):
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = self.path.with_suffix('.tmp')
+        with temporary.open('w') as handle:
+            os.chmod(temporary, 0o600)
+            json.dump(state, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(self.path)
+
+
 class GithubState:
     def __init__(self):
         repo = os.environ['GITHUB_REPOSITORY']
@@ -134,7 +171,7 @@ def reserve(state, candle, direction, now):
     if now - state.get('last_alert', 0) < 30*60_000:
         return False
     state.update(last_alert=now, count=state.get('count', 0)+1,
-                 delivery='reserved', signal_id=f'ETHUSDT:5m:{candle}:{direction}')
+                 delivery='reserved', signal_id=f'ETHUSDT:1m:{candle}:{direction}')
     return True
 
 
@@ -152,7 +189,7 @@ def main():
     if os.getenv('AI_ENABLED', 'false') != 'false':
         raise SafeError('AI is locked off in this trial')
     if args.demo:
-        print('ETHUSDT 永续 | 示例数据，非实时\n5m/15m 指标分析；AI复核未启用；无下单功能')
+        print('ETHUSDT 永续 | 示例数据，非实时\n1m确认 + 5m/15m趋势分析；AI复核未启用；无下单功能')
         return
     if not args.dry_run:
         if os.getenv('MONITOR_ENABLED') != 'true':
@@ -165,24 +202,24 @@ def main():
             raise SafeError('Configure Telegram Secrets first')
     now = int(request(BINANCE+'/fapi/v1/time')['serverTime'])
     frames = []
-    for minutes in (5, 15):
+    for minutes in (1, 5, 15):
         params = urllib.parse.urlencode({'symbol':'ETHUSDT', 'interval':f'{minutes}m', 'limit':200, 'endTime':now})
         rows = closed(request(BINANCE+'/fapi/v1/klines?'+params), minutes, now)
         frames.append((rows, indicators(rows)))
-    rows, a = frames[0]
-    b = frames[1][1]
-    direction = signal(a, b)
+    rows, minute = frames[0]
+    a, b = frames[1][1], frames[2][1]
+    direction = entry_signal(minute, a, b)
     stamp = dt.datetime.fromtimestamp(rows[-1]['end']/1000, dt.timezone.utc).isoformat()
-    text = f'ETHUSDT USDⓈ-M 永续 | {direction}\n已收盘5m: {stamp}\n'
-    for label, data in [('5m', a), ('15m', b)]:
+    text = f'ETHUSDT USDⓈ-M 永续 | {direction}\n建仓候选（规则筛选）\n已收盘1m: {stamp}\n'
+    for label, data in [('1m', minute), ('5m', a), ('15m', b)]:
         text += (f'{label}: 收盘 {data["close"]:.2f} | EMA9/21 {data["ema9"]:.2f}/{data["ema21"]:.2f}'
                  f' | RSI14 {data["rsi"]:.1f} | ATR14 {data["atr"]:.2f} | 量比20 {data["volume_ratio"]:.2f}\n')
     if direction != '观察':
-        text += review_candidate({'5m':a, '15m':b})+'\n'
+        text += review_candidate({'1m':minute, '5m':a, '15m':b})+'\n'
     text += '规则观察提醒，不构成交易建议；无自动下单。'
     if args.dry_run:
         print(text); return
-    store = GithubState()
+    store = LocalState() if os.getenv('STATE_BACKEND') == 'local' else GithubState()
     state = store.load()
     send = reserve(state, rows[-1]['end'], direction, now)
     store.save(state)  # durable reservation BEFORE Telegram
