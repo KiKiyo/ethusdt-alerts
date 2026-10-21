@@ -1,6 +1,6 @@
 # ETHUSDT 永续五分钟提醒 · 免费测试版
 
-状态：代码可本地测试；部署后须配置 Secrets/Variables 并手动验收。默认关闭通知和 AI。没有交易接口、Binance 账户密钥或自动下单功能。
+状态：2026-10-21 已上传完整项目；本机及GitHub Actions的8项测试通过，但Actions美国eastus2节点访问Binance返回HTTP 451，实时行情验收失败，尚未启用自动提醒。需另选合规执行环境后配置 Secrets/Variables 并验收。默认关闭通知和 AI。没有交易接口、Binance 账户密钥或自动下单功能。
 
 ## 数据与规则
 
@@ -60,7 +60,7 @@ cron `2-57/5 * * * *` 为UTC每小时2、7…57分，避开整点；GitHub sched
 
 ## 已执行验证
 
-8项离线单元测试涵盖已收盘过滤、断档/过期/NaN拒绝、EMA/RSI/ATR、双周期信号、去重/冷却/日上限、GitHub SHA更新、离线AI及错误密钥保护。本次本机真实行情测试因DNS无法解析 fapi.binance.com 未通过；Actions及Telegram端到端仍待验证。
+8项离线单元测试涵盖已收盘过滤、断档/过期/NaN拒绝、EMA/RSI/ATR、双周期信号、去重/冷却/日上限、GitHub SHA更新、离线AI及错误密钥保护。本次本机真实行情测试因DNS无法解析 fapi.binance.com 未通过；Actions实测单元测试通过，但Binance请求返回HTTP 451；Telegram端到端仍待验证。详见 https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39637113034 。
 
 ## 官方参考
 
