@@ -20,6 +20,13 @@ jobs:
           persist-credentials: false
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
+      - name: Validate saved private recipient (manual deployment only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_CRYPTOBLOWER_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TRIAL_UNTIL: ${{ vars.TRIAL_UNTIL }}
+        run: python3 telegram_ready.py
       - name: Read closed candles and notify
         env:
           GITHUB_TOKEN: ${{ github.token }}
