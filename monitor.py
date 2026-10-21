@@ -171,7 +171,7 @@ def reserve(state, candle, direction, now):
     if now - state.get('last_alert', 0) < 30*60_000:
         return False
     state.update(last_alert=now, count=state.get('count', 0)+1,
-                 delivery='reserved', signal_id=f'ETHUSDT:1m:{candle}:{direction}')
+                 delivery='reserved', signal_id=f'ETHUSDT:5m:{candle}:{direction}')
     return True
 
 
@@ -189,7 +189,7 @@ def main():
     if os.getenv('AI_ENABLED', 'false') != 'false':
         raise SafeError('AI is locked off in this trial')
     if args.demo:
-        print('ETHUSDT 永续 | 示例数据，非实时\n1m确认 + 5m/15m趋势分析；AI复核未启用；无下单功能')
+        print('ETHUSDT 永续 | 示例数据，非实时\n5m/15m趋势分析；AI复核未启用；无下单功能')
         return
     if not args.dry_run:
         if os.getenv('MONITOR_ENABLED') != 'true':
@@ -202,20 +202,20 @@ def main():
             raise SafeError('Configure Telegram Secrets first')
     now = int(request(BINANCE+'/fapi/v1/time')['serverTime'])
     frames = []
-    for minutes in (1, 5, 15):
+    for minutes in (5, 15):
         params = urllib.parse.urlencode({'symbol':'ETHUSDT', 'interval':f'{minutes}m', 'limit':200, 'endTime':now})
         rows = closed(request(BINANCE+'/fapi/v1/klines?'+params), minutes, now)
         frames.append((rows, indicators(rows)))
-    rows, minute = frames[0]
-    a, b = frames[1][1], frames[2][1]
-    direction = entry_signal(minute, a, b)
+    rows, a = frames[0]
+    b = frames[1][1]
+    direction = signal(a, b)
     stamp = dt.datetime.fromtimestamp(rows[-1]['end']/1000, dt.timezone.utc).isoformat()
-    text = f'ETHUSDT USDⓈ-M 永续 | {direction}\n建仓候选（规则筛选）\n已收盘1m: {stamp}\n'
-    for label, data in [('1m', minute), ('5m', a), ('15m', b)]:
+    text = f'ETHUSDT USDⓈ-M 永续 | {direction}\n建仓候选（规则筛选）\n已收盘5m: {stamp}\n'
+    for label, data in [('5m', a), ('15m', b)]:
         text += (f'{label}: 收盘 {data["close"]:.2f} | EMA9/21 {data["ema9"]:.2f}/{data["ema21"]:.2f}'
                  f' | RSI14 {data["rsi"]:.1f} | ATR14 {data["atr"]:.2f} | 量比20 {data["volume_ratio"]:.2f}\n')
     if direction != '观察':
-        text += review_candidate({'1m':minute, '5m':a, '15m':b})+'\n'
+        text += review_candidate({'5m':a, '15m':b})+'\n'
     text += '规则观察提醒，不构成交易建议；无自动下单。'
     if args.dry_run:
         print(text); return
