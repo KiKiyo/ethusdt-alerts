@@ -1,3 +1,7 @@
+## 自动调度修复状态（2026-10-21 22:25 UTC）
+
+原生GitHub定时未按计划触发；手动验收通过不等于稳定运行。已由仓库拥有者网页提交重新登记cron（每小时1、6…56分），增加last_analysis_at/run_id/trigger健康记录。用户已批准免费cron-job.org独立调度，接收端与EXTERNAL_SCHEDULER.md已准备；待用户登录服务并在GitHub完成创建短期令牌前的身份验证。独立调度尚未上线，尚未创建或传输新令牌。
+
 # CryptoBlower · OKX ETH-USDT 永续每5分钟候选提醒
 
 已按用户授权更换行情源：**OKX ETH-USDT-SWAP USDT本位永续**。它与Binance价格、成交量和信号可能不同。2026-10-21 GitHub Actions真实行情验收成功，读取5m/15m已收盘K线并计算指标；已启用免费云端测试，截止2026-10-24T22:00:00Z（多伦多10月24日18:00）；TELEGRAM_CHAT_ID已保存，正式工作流首次运行成功。没有付费AI、付费资源或自动下单。
