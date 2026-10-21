@@ -11,7 +11,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-BINANCE = 'https://fapi.binance.com'
+OKX = 'https://www.okx.com'
+MARKET = 'OKX:ETH-USDT-SWAP'
 
 
 class SafeError(Exception):
@@ -46,13 +47,53 @@ def closed(rows, interval, now):
                 or v < 0 or h < max(o, c, lo) or lo > min(o, c)
                 or t % step or end != t + step - 1):
             raise SafeError('Invalid candle values')
-        if end < now - 2000:  # Binance server clock, with settlement buffer
+        if end < now - 2000:  # Exchange server clock, with settlement buffer
             out.append(dict(t=t, end=end, o=o, h=h, l=lo, c=c, v=v))
     if len(out) < 100 or any(b['t'] - a['t'] != step for a, b in zip(out, out[1:])):
         raise SafeError('Insufficient, duplicate or gapped candles')
     if now - out[-1]['end'] > step + 5000:
         raise SafeError('Stale candle data')
     return out
+
+
+def okx_data(path, params=None):
+    url = OKX + path
+    if params:
+        url += '?' + urllib.parse.urlencode(params)
+    response = request(url)
+    if response.get('code') != '0' or not isinstance(response.get('data'), list):
+        raise SafeError('OKX business/schema error')
+    return response['data']
+
+
+def okx_candles(raw, minutes, now):
+    # OKX is newest-first. confirm=1 is mandatory; vol is contract volume.
+    rows = []
+    for r in raw:
+        if len(r) != 9 or r[8] not in ('0', '1'):
+            raise SafeError('Malformed OKX candle')
+        if r[8] == '1':
+            start = int(r[0])
+            rows.append([start, *r[1:6], start + minutes*60_000 - 1])
+    rows.sort(key=lambda r: r[0])
+    return closed(rows, minutes, now)
+
+
+def market_frames():
+    now = int(okx_data('/api/v5/public/time')[0]['ts'])
+    instrument = okx_data('/api/v5/public/instruments',
+                          {'instType':'SWAP','instId':'ETH-USDT-SWAP'})
+    if (len(instrument) != 1 or instrument[0].get('state') != 'live'
+            or instrument[0].get('ctType') != 'linear'
+            or instrument[0].get('settleCcy') != 'USDT'):
+        raise SafeError('OKX ETH USDT linear swap unavailable')
+    frames = []
+    for minutes in (5, 15):
+        data = okx_data('/api/v5/market/candles',
+                        {'instId':'ETH-USDT-SWAP','bar':f'{minutes}m','limit':200})
+        rows = okx_candles(data, minutes, now)
+        frames.append((rows, indicators(rows)))
+    return now, frames
 
 
 def ema(values, n):
@@ -171,7 +212,7 @@ def reserve(state, candle, direction, now):
     if now - state.get('last_alert', 0) < 30*60_000:
         return False
     state.update(last_alert=now, count=state.get('count', 0)+1,
-                 delivery='reserved', signal_id=f'ETHUSDT:5m:{candle}:{direction}')
+                 delivery='reserved', signal_id=f'OKX:ETH-USDT-SWAP:5m:{candle}:{direction}')
     return True
 
 
@@ -189,7 +230,7 @@ def main():
     if os.getenv('AI_ENABLED', 'false') != 'false':
         raise SafeError('AI is locked off in this trial')
     if args.demo:
-        print('ETHUSDT 永续 | 示例数据，非实时\n5m/15m趋势分析；AI复核未启用；无下单功能')
+        print('OKX ETH-USDT-SWAP | 示例数据，非实时\n5m/15m趋势分析；AI复核未启用；无下单功能')
         return
     if not args.dry_run:
         if os.getenv('MONITOR_ENABLED') != 'true':
@@ -200,17 +241,12 @@ def main():
             raise SafeError('Trial expired or exceeds seven days')
         if not os.getenv('TELEGRAM_BOT_TOKEN') or not os.getenv('TELEGRAM_CHAT_ID'):
             raise SafeError('Configure Telegram Secrets first')
-    now = int(request(BINANCE+'/fapi/v1/time')['serverTime'])
-    frames = []
-    for minutes in (5, 15):
-        params = urllib.parse.urlencode({'symbol':'ETHUSDT', 'interval':f'{minutes}m', 'limit':200, 'endTime':now})
-        rows = closed(request(BINANCE+'/fapi/v1/klines?'+params), minutes, now)
-        frames.append((rows, indicators(rows)))
+    now, frames = market_frames()
     rows, a = frames[0]
     b = frames[1][1]
     direction = signal(a, b)
     stamp = dt.datetime.fromtimestamp(rows[-1]['end']/1000, dt.timezone.utc).isoformat()
-    text = f'ETHUSDT USDⓈ-M 永续 | {direction}\n建仓候选（规则筛选）\n已收盘5m: {stamp}\n'
+    text = f'OKX ETH-USDT-SWAP USDT本位永续 | {direction}\n建仓候选（规则筛选）\n已收盘5m: {stamp}\n'
     for label, data in [('5m', a), ('15m', b)]:
         text += (f'{label}: 收盘 {data["close"]:.2f} | EMA9/21 {data["ema9"]:.2f}/{data["ema21"]:.2f}'
                  f' | RSI14 {data["rsi"]:.1f} | ATR14 {data["atr"]:.2f} | 量比20 {data["volume_ratio"]:.2f}\n')
@@ -221,6 +257,9 @@ def main():
         print(text); return
     store = LocalState() if os.getenv('STATE_BACKEND') == 'local' else GithubState()
     state = store.load()
+    if state.get('market', MARKET) != MARKET:
+        raise SafeError('State belongs to another market; explicit migration required')
+    state['market'] = MARKET
     send = reserve(state, rows[-1]['end'], direction, now)
     store.save(state)  # durable reservation BEFORE Telegram
     if send:
