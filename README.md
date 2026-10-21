@@ -1,8 +1,8 @@
 # CryptoBlower · OKX ETH-USDT 永续每5分钟候选提醒
 
-已按用户授权更换行情源：**OKX ETH-USDT-SWAP USDT本位永续**。它与Binance价格、成交量和信号可能不同。2026-10-21 GitHub Actions真实行情验收成功，读取5m/15m已收盘K线并计算指标；当前自动提醒仍未启用，需完成Telegram chat ID配置与通知验证。没有付费AI、付费资源或自动下单。
+已按用户授权更换行情源：**OKX ETH-USDT-SWAP USDT本位永续**。它与Binance价格、成交量和信号可能不同。2026-10-21 GitHub Actions真实行情验收成功，读取5m/15m已收盘K线并计算指标；已启用免费云端测试，截止2026-10-24T22:00:00Z（多伦多10月24日18:00）；TELEGRAM_CHAT_ID已保存，正式工作流首次运行成功。没有付费AI、付费资源或自动下单。
 
-[云端行情成功记录](https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39681966463)：15项测试和真实dry-run通过。本地新增私聊连接测试后共17项测试通过。
+[云端行情成功记录](https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39681966463)：15项测试和真实dry-run通过。正式工作流中17项测试通过，保存的私聊接收人已验证，Telegram测试回执已确认，OKX行情和GitHub持久化状态正常。首次运行无新候选，按预期静默。\n\n[正式运行验收记录](https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39682890028)。每小时2、7…57分计划执行；GitHub可能延迟/丢失，不保证精确五分钟。到期脚本停止分析和候选通知；定时runner仍可能启动，彻底停用可在Actions禁用workflow或将MONITOR_ENABLED=false。人工启动workflow会额外发送配置测试回执，定时运行不会发送此回执。
 
 ## 筛选规则
 
@@ -26,7 +26,7 @@ python3 monitor.py --demo
 python3 monitor.py --dry-run
 ```
 
-17项本地离线测试覆盖指标、双周期与保留的1m确认、已收盘筛选、断档/过期/NaN、去重/冷却/日上限、状态持久化和文件权限、GitHub条件更新、离线AI及密钥错误保护。OKX真实行情已在Actions成功；Telegram及自动提醒仍待验收。
+17项本地离线测试覆盖指标、双周期与保留的1m确认、已收盘筛选、断档/过期/NaN、去重/冷却/日上限、状态持久化和文件权限、GitHub条件更新、离线AI及密钥错误保护。OKX真实行情已在Actions成功；Telegram测试投递与首次正式运行已验收；尚未出现实际建仓候选。
 
 ## Telegram安全配置
 
@@ -38,7 +38,7 @@ python3 monitor.py --dry-run
 
 ## Actions五分钟部署
 
-仅允许独立公开仓库标准ubuntu-latest，私有仓库job跳过；不使用付费runner、artifact或cache。单次最长2分钟。配置Secrets如上；Variables为TRIAL_UNTIL（未来7天内）、BOOTSTRAP_STATE=false（仓库已初始化.state/state.json）、MONITOR_ENABLED=true（当前不要启用）。工作流需要Contents写权限保存去重状态，不需要PAT或Binance账户密钥。到期脚本不发通知，但仍应禁用workflow或设MONITOR_ENABLED=false停止runner启动。
+仅允许独立公开仓库标准ubuntu-latest，私有仓库job跳过；不使用付费runner、artifact或cache。单次最长2分钟。配置Secrets如上；Variables为TRIAL_UNTIL（未来7天内）、BOOTSTRAP_STATE=false（仓库已初始化.state/state.json）、MONITOR_ENABLED=true（已启用）。工作流需要Contents写权限保存去重状态，不需要PAT或Binance账户密钥。到期脚本不发通知，但仍应禁用workflow或设MONITOR_ENABLED=false停止runner启动。
 
 公开仓库标准runner目前免费；账户级预算未由本项目设置，用户需在Billing核实并设置可用的预算停止选项。通知上限不等于账单硬限额。理论5分钟每天288次、30天8640次，不能将私人仓库按此频率运行视作免费。
 
