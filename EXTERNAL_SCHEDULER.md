@@ -1,3 +1,7 @@
+## 最新配置状态
+
+cron-job.org账户已登录，任务8696180已创建，处于Inactive。已配置每5分钟、POST触发地址、JSON正文与Accept/Content-Type请求头；Authorization暂为Bearer占位，无实际令牌。任务在America/Toronto的2026-10-24 18:00到期。GitHub细粒度令牌表单已配置为单仓库ethusdt-alerts、Actions读写+必需Metadata只读、2026-10-24到期，尚未点击Generate token。待用户亲自生成并在cron-job.org Authorization中保存后，才能测试并启用。未声称自动运行恢复。
+
 # 独立免费调度配置（待用户登录与短期令牌）
 
 用户已明确批准将仅限 KiKiyo/ethusdt-alerts、Actions写权限、2026-10-24到期的短期GitHub令牌存入cron-job.org。Telegram token及chat ID仍只保存在GitHub Secrets；不得存入调度服务。令牌不发送到聊天、仓库文件或日志。
