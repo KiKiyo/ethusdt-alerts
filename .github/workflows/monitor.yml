@@ -35,5 +35,9 @@ jobs:
           MONITOR_ENABLED: ${{ vars.MONITOR_ENABLED }}
           TRIAL_UNTIL: ${{ vars.TRIAL_UNTIL }}
           BOOTSTRAP_STATE: ${{ vars.BOOTSTRAP_STATE }}
+          # Both gates stay false until separate paid-use approval.
           AI_ENABLED: 'false'
+          AI_PAID_APPROVED: 'false'
+          OPENAI_MODEL: 'gpt-5.4-mini-2026-03-17'
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 monitor.py
