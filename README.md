@@ -1,6 +1,6 @@
 # CryptoBlower · OKX ETH-USDT 永续每5分钟候选提醒
 
-使用 **OKX ETH-USDT-SWAP USDT本位永续**公开行情，每5分钟筛选一次候选信号；只有符合规则的新候选才向 @CryptoBlower_bot 私聊发送提醒。行情和信号与Binance可能不同。没有自动下单。OpenAI GPT-5.4 mini复核接口已接入但保持关闭，没有调用付费AI或创建付费资源；配置和后续启用步骤见 [AI_SETUP.md](AI_SETUP.md)。
+使用 **OKX ETH-USDT-SWAP USDT本位永续**公开行情，每5分钟筛选一次候选信号；只有符合规则的新候选才向 @CryptoBlower_bot 私聊发送提醒。行情和信号与Binance可能不同。没有自动下单。OpenAI GPT-5.4 mini已获用户批准启用条件复核，仅新的合格候选才调用；普通观察、重复信号和冷却期不调用。每天最多3次、累计最多9次，达到限额即停止；当前累计已用2次尝试，剩余7次。没有创建额外付费资源；配置和限额见 [AI_SETUP.md](AI_SETUP.md)。
 
 2026-10-25已修复外部调度：cron-job.org定时触发GitHub Actions，原生GitHub schedule保留为备用。当前试运行截止 **2026-10-28T22:00:00Z（多伦多10月28日18:00）**，届时外部任务停止，程序也停止分析和发送。调度短期令牌10月29日到期；续期或付费步骤须另行确认。已验证多伦多时间20:36、20:41连续两轮真实自动分析成功；当前无新候选，按规则静默。具体配置及验收见 [EXTERNAL_SCHEDULER.md](EXTERNAL_SCHEDULER.md)。免费调度和GitHub排队可能延迟，不承诺严格每300秒执行。
 
@@ -50,7 +50,7 @@ python3 monitor.py --dry-run
 
 发送前必须持久化reserved状态；Actions使用GitHub Contents SHA条件更新及concurrency串行，本机用锁及原子文件。发送仅尝试一次，显式allow_paid_broadcast=false；成功后写confirmed。超时或发送后写回失败可能漏发且保留reserved，需人工核查，不自动重试以避免重复，不承诺exactly-once。状态丢失时默认失败关闭，删除/重建状态可能重发。公开仓库的状态只有时间、方向和计数，无token/chat ID。
 
-HTTP错误不输出URL和响应体，避免Telegram URL中的token泄露。不要开启HTTP调试追踪。没有自动下单、交易账户密钥、付费模型调用或新建付费资源。后续任何付费服务均须单独获得用户明确批准。
+HTTP错误不输出URL和响应体，避免Telegram URL中的token泄露。不要开启HTTP调试追踪。没有自动下单或交易账户密钥。用户已批准按AI_SETUP.md的条件与限额调用OpenAI；更贵模型、增加额度及其他付费服务仍须单独获得明确批准。
 
 ## 参考
 
