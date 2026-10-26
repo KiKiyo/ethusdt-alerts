@@ -10,6 +10,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo
 import ai_review
 
 OKX = 'https://www.okx.com'
@@ -222,6 +223,43 @@ def review_candidate(candidate):
     return 'AI复核未启用（免费测试版；仅规则分析）'
 
 
+def format_alert(direction, five, fifteen, candle_end, analyzed_at, review=None):
+    """Plain-language notification; prices are historical references, not orders."""
+    zone = ZoneInfo('America/Toronto')
+    def local(milliseconds):
+        return dt.datetime.fromtimestamp(milliseconds/1000, zone).strftime('%Y-%m-%d %H:%M:%S %Z')
+    if direction == '偏多':
+        title = '🟢 ETH 上涨方向观察提醒'
+        conclusion = '5分钟和15分钟走势同时偏强，出现偏多候选。'
+        reason = '两个周期的短期趋势向上，价格动能处于偏强区间。'
+    elif direction == '偏空':
+        title = '🔴 ETH 下跌方向观察提醒'
+        conclusion = '5分钟和15分钟走势同时偏弱，出现偏空候选。'
+        reason = '两个周期的短期趋势向下，价格动能处于偏弱区间。'
+    else:
+        return f'⚪ ETH 暂无新候选\n目前未同时满足筛选条件。\n分析时间：{local(analyzed_at)}（多伦多）'
+    price = five['close']
+    volume = five['volume_ratio']
+    text = (f'{title}\n\n'
+            f'判断：{conclusion}\n'
+            f'参考价格：{price:,.2f} USDT（5分钟收盘价，并非当前报价或建议成交价）\n\n'
+            f'为什么提醒你：\n'
+            f'• {reason}\n'
+            f'• 最近5分钟成交量是此前20根平均值的 {volume:.2f} 倍。\n\n'
+            f'波动参考：按近期5分钟数据计算，平均波幅约 {five["atr"]:.2f} USDT'
+            f'（约 {five["atr"]/price*100:.2f}%）。实际波动可能更大，这不是目标价或止损价。\n\n'
+            f'行情：OKX ETH / USDT 永续合约\n'
+            f'数据收盘：{local(candle_end)}\n'
+            f'分析时间：{local(analyzed_at)}\n'
+            f'以上时间均为多伦多当地时间。\n\n')
+    if review and review.get('enabled'):
+        risk = {'normal': '一般', 'elevated': '较高', 'high': '高'}[review['risk']]
+        text += f'AI复核：通过｜风险程度：{risk}\n说明：{review["reason"]}\n'
+    else:
+        text += 'AI复核：未进行，本条仅依据规则筛选。\n'
+    return text + '这是观察候选，不是立即开仓指令；系统不会自动下单。'
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true')
@@ -249,16 +287,8 @@ def main():
     rows, a = frames[0]
     b = frames[1][1]
     direction = signal(a, b)
-    stamp = dt.datetime.fromtimestamp(rows[-1]['end']/1000, dt.timezone.utc).isoformat()
-    text = f'OKX ETH-USDT-SWAP USDT本位永续 | {direction}\n建仓候选（规则筛选）\n已收盘5m: {stamp}\n'
-    for label, data in [('5m', a), ('15m', b)]:
-        text += (f'{label}: 收盘 {data["close"]:.2f} | EMA9/21 {data["ema9"]:.2f}/{data["ema21"]:.2f}'
-                 f' | RSI14 {data["rsi"]:.1f} | ATR14 {data["atr"]:.2f} | 量比20 {data["volume_ratio"]:.2f}\n')
-    if direction != '观察' and args.dry_run:
-        text += review_candidate({'5m':a, '15m':b})+'\n'
-    text += '规则观察提醒，不构成交易建议；无自动下单。'
     if args.dry_run:
-        print(text); return
+        print(format_alert(direction, a, b, rows[-1]['end'], now)); return
     store = LocalState() if os.getenv('STATE_BACKEND') == 'local' else GithubState()
     state = store.load()
     if state.get('market', MARKET) != MARKET:
@@ -283,10 +313,7 @@ def main():
             state['delivery'] = 'ai_withheld'
             store.save(state)
             print('AI withheld candidate notification'); return
-        if review['enabled']:
-            text += f'\nAI复核 {ai_review.MODEL} | 风险 {review["risk"]}\n{review["reason"]}'
-        else:
-            text += '\n'+review['reason']
+        text = format_alert(direction, a, b, rows[-1]['end'], now, review)
         state['delivery'] = 'reserved'
         store.save(state)
         result = request('https://api.telegram.org/bot'+os.environ['TELEGRAM_BOT_TOKEN']+'/sendMessage',
