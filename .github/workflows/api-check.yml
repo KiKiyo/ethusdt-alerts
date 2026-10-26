@@ -1,0 +1,42 @@
+name: Check OpenAI connection without inference
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate key format and list available models (no inference)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os,json,urllib.request,urllib.error
+          key=os.getenv('OPENAI_API_KEY','')
+          valid=bool(key) and key.startswith('sk-') and key.isascii() and not any(c.isspace() for c in key)
+          print('Key format:', 'plausible' if valid else 'invalid or whitespace; replace Secret directly')
+          headers={'Authorization':'Bearer '+key} if valid else {}
+          req=urllib.request.Request('https://api.openai.com/v1/models',headers=headers)
+          try:
+              with urllib.request.urlopen(req,timeout=15) as r:
+                  raw=r.read(1000000)
+                  try:
+                      data=json.loads(raw)
+                  except Exception as exc:
+                      print('Non-JSON response; category:',type(exc).__name__)
+                      raise SystemExit(1)
+                  print('Authenticated model listing succeeded; no inference requested')
+                  print('Configured model available:',any(x.get('id')=='gpt-5.4-mini-2026-03-17' for x in data.get('data',[])))
+          except urllib.error.HTTPError as exc:
+              print('HTTP status:',exc.code,'(body and URL suppressed)')
+              raise SystemExit(1)
+          except urllib.error.URLError as exc:
+              print('Connection failure category:',type(exc.reason).__name__)
+              raise SystemExit(1)
+          except Exception as exc:
+              print('Failure category:',type(exc).__name__)
+              raise SystemExit(1)
+          PY
