@@ -1,34 +1,35 @@
-# OpenAI候选复核配置（未启用）
+# OpenAI候选复核：已启用条件调用
 
-用户授权：配置OpenAI，但不开启付费调用。当前两条工作流都硬编码AI_ENABLED=false、AI_PAID_APPROVED=false；仅添加密钥不会开启调用。没有创建API密钥、购买额度或发出真实OpenAI API请求。现有免费规则提醒继续工作。
+2026-10-25用户明确批准持续付费，但仅在系统认为有意义时调用AI。两条监测工作流现为AI_ENABLED=true、AI_PAID_APPROVED=true；OPENAI_API_KEY通过GitHub Secrets注入。单次真实模型分析和Telegram投递已验证成功：
+https://github.com/KiKiyo/ethusdt-alerts/actions/runs/40259613694
 
-## 已配置的模型与接口
+## “有意义”的具体条件
 
-- 模型：gpt-5.4-mini-2026-03-17，固定快照，禁止通过环境变量任意换为更贵模型。
-- API：https://api.openai.com/v1/responses；只连接OpenAI官方域名，不跟随重定向。
-- 输入：OKX ETH-USDT-SWAP、候选多空方向、收盘时间、5m/15m EMA9/21、RSI14、ATR14、收盘价和量比。只允许指定数字字段，不发送Telegram密钥、聊天ID、个人持仓或GitHub令牌。
-- 输出：严格JSON，accept/reject、normal/elevated/high风险和简短中文说明；模型不能改变候选方向。没有联网搜索、工具调用或下单功能，store=false。
-- 仅去重/冷却/日提醒上限筛选通过的新候选才可能调用。dry-run、单元测试和普通观察周期不调用模型。
-- 在持久化调用次数后才请求API；最多每UTC日3次、该状态生命周期累计9次，单次最多1200输出token（含推理）；不自动重试，超时25秒。失败尝试也消耗次数。
-- 高风险、reject、拒答、截断、错误或达到调用限额均暂扣提醒，不降级为声称AI已认可的信号。候选和冷却已预留，可能错过后续同方向候选；不保证每个规则候选都送达。
+每5分钟读取OKX ETH-USDT-SWAP已收盘的5分钟/15分钟行情。EMA方向一致、RSI落在对应方向区间、5分钟量比至少1.2、ATR/收盘在0.1%–3%之间才可能形成候选。随后必须通过新的K线、候选方向变化、30分钟冷却和每天提醒上限的检查，才调用一次AI。普通观察周期、重复方向、冷却期内候选均不调用模型。dry-run和单元测试不调用模型。
 
-## 密钥安全配置（可暂不执行）
+AI只复核提供的公开指标，不能反向创造交易信号；模型accept且风险不是high才发送Telegram。拒绝、截断、拒答、接口错误或达到限额时暂扣通知。已预留的候选不自动重试，因此可能错过后续同方向候选。没有联网新闻、订单簿或个人持仓分析，也没有下单功能。
 
-若已有OpenAI API密钥，可直接在 https://github.com/KiKiyo/ethusdt-alerts/settings/secrets/actions → New repository secret 保存：名称 OPENAI_API_KEY，值为自己的密钥。不要发到聊天、Issue、代码、截图或cron-job.org。只需告知“Secret已保存”，不要提供密钥内容。
+## 模型、限额及有效期
 
-没有密钥时，可在 https://platform.openai.com/api-keys 创建独立项目密钥；无需现在充值或开启自动充值。若页面要求购买额度，暂停，所有付费步骤需另行明确批准。当前无需创建密钥即可完成离线配置。
+- 模型固定为gpt-5.4-mini-2026-03-17。
+- 官方接口：https://api.openai.com/v1/responses；store=false，tools为空。
+- 每UTC日最多3次，持久状态生命周期累计最多9次；单次最多1200输出token（含推理），25秒超时，不自动重试。
+- 目前累计2次已预留尝试（含此前失败尝试和成功单次测试），累计额度剩余7次；日计数包含测试。
+- 每次先持久保存次数才请求API；失败也占次数。禁止清空状态绕过限额。达到限额后停止调用，增加额度需另行确认。
+- 当前试用仍在2026-10-28T22:00:00Z（多伦多10月28日18:00）停止。此次授权没有延长试用或外部调度期限。
+- 这些限额仅约束本程序，不是账户总账单硬封顶。未设置自动充值、未购买额外资源。
 
-## 后续付费启用边界
+## 密钥与故障处理
 
-启用前需向用户说明模型、单价、调用次数上限、试用日期及发送给OpenAI的数据，并单独取得明确付费授权。之后才能修改两条工作流的AI_ENABLED与AI_PAID_APPROVED；单独添加GitHub Variable不会绕过代码中的关闭状态。启用后才做一次真实API验收（计入持久化次数），现阶段尚未验证账户访问、额度和真实模型响应。
+OPENAI_API_KEY、Telegram token和chat ID只保存为GitHub Secrets，不交给cron-job.org或写入日志/仓库。只将市场标识、候选方向、收盘时间及5m/15m指标发送给OpenAI。GitHub、Telegram凭据和账户数据不进入模型输入。
 
-不要清空.state/state.json或重置ai_total_calls来绕过累计限额。此限额仅约束本程序，不能约束其他程序对同一API密钥的消费，也不是账户账单硬封顶。试用到期TRIAL_UNTIL仍会先停止分析和调用。
+旧连接检查在本地过早拦截密钥，返回的401来自未带密钥的请求，不能作为密钥被OpenAI拒绝的证据。已改成不假设前缀的认证检查，并成功验证新密钥及模型访问。api-check.yml只读取模型列表，不运行推理；失败立即停止，不自动重试。
 
-## 费用参考与验证
+28项离线测试通过，覆盖开关、持久化、配额、单次测试去重、拒绝/高风险暂扣、失败不重试及dry-run不调用。规则与AI复核效果未经回测，不保证盈利。
 
-2026-10-25核对官方文档，标准文本输入每百万token $0.75，输出每百万token $4.50（美元）。例如一次1000输入、1200输出约$0.00615；实际取决于用量、服务定价及税费，不是获准消费的预算。
+## 费用依据
 
-本地25项测试通过，使用模拟API响应，覆盖付费开关、调用前持久化、失败不重试、日/累计限额、字段白名单、拒答/截断/错误输出、AI拒绝/高风险暂扣及dry-run零付费调用。真实API未调用，模型的信号改善效果未经回测。
+2026-10-25核对官方模型页：标准文本输入每百万token US$0.75，输出每百万token US$4.50。一次1000输入、1200输出约US$0.00615，实际取决于用量、定价及税费。没有额外搜索工具费。此次用户已批准按上述条件持续调用；更贵模型、增加限额或额外付费资源需另行确认。
 
-- https://developers.openai.com/api/docs/models/gpt-5.4-mini
-- https://developers.openai.com/api/docs/guides/structured-outputs
+https://developers.openai.com/api/docs/models/gpt-5.4-mini
+https://developers.openai.com/api/docs/guides/structured-outputs
