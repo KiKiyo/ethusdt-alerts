@@ -1,0 +1,37 @@
+name: One approved AI analysis
+on:
+  workflow_dispatch:
+    inputs:
+      paid_approved:
+        description: 'Explicitly approve ONE GPT-5.4 mini API call, then Telegram test. No recurring AI.'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: ethusdt-monitor
+  cancel-in-progress: false
+jobs:
+  preview:
+    if: github.event.repository.private == false && inputs.paid_approved == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Offline tests
+        run: python3 -m unittest discover -s tests -q
+      - name: One paid AI analysis and labelled Telegram test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_CRYPTOBLOWER_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TRIAL_UNTIL: ${{ vars.TRIAL_UNTIL }}
+          AI_ENABLED: 'true'
+          AI_PAID_APPROVED: 'true'
+          ONE_OFF_PAID_APPROVED: 'true'
+          OPENAI_MODEL: 'gpt-5.4-mini-2026-03-17'
+        run: python3 ai_preview.py
