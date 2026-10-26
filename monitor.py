@@ -10,6 +10,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import ai_review
 
 OKX = 'https://www.okx.com'
 MARKET = 'OKX:ETH-USDT-SWAP'
@@ -217,8 +218,7 @@ def reserve(state, candle, direction, now):
 
 
 def review_candidate(candidate):
-    # No network, credentials, model, or paid API exists in this free trial.
-    # Implement a verified provider only after separate explicit approval.
+    # Compatibility helper for the retained local runner; never calls a paid API.
     return 'AI复核未启用（免费测试版；仅规则分析）'
 
 
@@ -227,8 +227,6 @@ def main():
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--demo', action='store_true')
     args = parser.parse_args()
-    if os.getenv('AI_ENABLED', 'false') != 'false':
-        raise SafeError('AI is locked off in this trial')
     if args.demo:
         print('OKX ETH-USDT-SWAP | 示例数据，非实时\n5m/15m趋势分析；AI复核未启用；无下单功能')
         return
@@ -243,6 +241,10 @@ def main():
             print('Trial expired; analysis and notifications stopped'); return
         if not os.getenv('TELEGRAM_BOT_TOKEN') or not os.getenv('TELEGRAM_CHAT_ID'):
             raise SafeError('Configure Telegram Secrets first')
+        try:
+            ai_review.check_config()
+        except ai_review.ReviewError as exc:
+            raise SafeError(str(exc)) from None
     now, frames = market_frames()
     rows, a = frames[0]
     b = frames[1][1]
@@ -252,7 +254,7 @@ def main():
     for label, data in [('5m', a), ('15m', b)]:
         text += (f'{label}: 收盘 {data["close"]:.2f} | EMA9/21 {data["ema9"]:.2f}/{data["ema21"]:.2f}'
                  f' | RSI14 {data["rsi"]:.1f} | ATR14 {data["atr"]:.2f} | 量比20 {data["volume_ratio"]:.2f}\n')
-    if direction != '观察':
+    if direction != '观察' and args.dry_run:
         text += review_candidate({'5m':a, '15m':b})+'\n'
     text += '规则观察提醒，不构成交易建议；无自动下单。'
     if args.dry_run:
@@ -266,8 +268,27 @@ def main():
     state['run_id'] = os.getenv('GITHUB_RUN_ID', 'local')
     state['trigger'] = os.getenv('GITHUB_EVENT_NAME', 'local')
     send = reserve(state, rows[-1]['end'], direction, now)
+    if send and ai_review.enabled():
+        state['delivery'] = 'ai_pending'
     store.save(state)  # durable reservation BEFORE Telegram
     if send:
+        try:
+            review = ai_review.review({'5m': a, '15m': b, 'direction': direction,
+                                       'closed_at': rows[-1]['end']}, state, store.save, now)
+        except ai_review.ReviewError as exc:
+            state['delivery'] = 'ai_error'
+            store.save(state)
+            raise SafeError(str(exc)) from None
+        if review['decision'] != 'accept' or review['risk'] == 'high':
+            state['delivery'] = 'ai_withheld'
+            store.save(state)
+            print('AI withheld candidate notification'); return
+        if review['enabled']:
+            text += f'\nAI复核 {ai_review.MODEL} | 风险 {review["risk"]}\n{review["reason"]}'
+        else:
+            text += '\n'+review['reason']
+        state['delivery'] = 'reserved'
+        store.save(state)
         result = request('https://api.telegram.org/bot'+os.environ['TELEGRAM_BOT_TOKEN']+'/sendMessage',
                          {'chat_id':os.environ['TELEGRAM_CHAT_ID'], 'text':text,
                           'protect_content':True, 'allow_paid_broadcast':False})
