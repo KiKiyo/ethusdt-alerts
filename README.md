@@ -1,6 +1,6 @@
 # CryptoBlower · OKX ETH-USDT 永续每5分钟候选提醒
 
-使用 **OKX ETH-USDT-SWAP USDT本位永续**公开行情，每5分钟筛选一次候选信号；只有符合规则的新候选才向 @CryptoBlower_bot 私聊发送提醒。行情和信号与Binance可能不同。没有自动下单，AI复核未启用，没有调用付费AI或创建付费资源。
+使用 **OKX ETH-USDT-SWAP USDT本位永续**公开行情，每5分钟筛选一次候选信号；只有符合规则的新候选才向 @CryptoBlower_bot 私聊发送提醒。行情和信号与Binance可能不同。没有自动下单。OpenAI GPT-5.4 mini复核接口已接入但保持关闭，没有调用付费AI或创建付费资源；配置和后续启用步骤见 [AI_SETUP.md](AI_SETUP.md)。
 
 2026-10-25已修复外部调度：cron-job.org定时触发GitHub Actions，原生GitHub schedule保留为备用。当前试运行截止 **2026-10-28T22:00:00Z（多伦多10月28日18:00）**，届时外部任务停止，程序也停止分析和发送。调度短期令牌10月29日到期；续期或付费步骤须另行确认。已验证多伦多时间20:36、20:41连续两轮真实自动分析成功；当前无新候选，按规则静默。具体配置及验收见 [EXTERNAL_SCHEDULER.md](EXTERNAL_SCHEDULER.md)。免费调度和GitHub排队可能延迟，不承诺严格每300秒执行。
 
@@ -26,7 +26,7 @@ python3 monitor.py --demo
 python3 monitor.py --dry-run
 ```
 
-17项本地离线测试覆盖指标、双周期与保留的1m确认、已收盘筛选、断档/过期/NaN、去重/冷却/日上限、状态持久化和文件权限、GitHub条件更新、离线AI及密钥错误保护。OKX真实行情、Telegram测试投递和历史候选投递均已在Actions通过。自动调度的最新验收见上方链接。
+25项本地离线测试（包含8项新增AI接入测试）覆盖指标、双周期与保留的1m确认、已收盘筛选、断档/过期/NaN、去重/冷却/日上限、状态持久化和文件权限、GitHub条件更新、离线AI及密钥错误保护。OKX真实行情、Telegram测试投递和历史候选投递均已在Actions通过。自动调度的最新验收见上方链接。
 
 ## Telegram安全配置
 
@@ -46,7 +46,7 @@ python3 monitor.py --dry-run
 
 发送前必须持久化reserved状态；Actions使用GitHub Contents SHA条件更新及concurrency串行，本机用锁及原子文件。发送仅尝试一次，显式allow_paid_broadcast=false；成功后写confirmed。超时或发送后写回失败可能漏发且保留reserved，需人工核查，不自动重试以避免重复，不承诺exactly-once。状态丢失时默认失败关闭，删除/重建状态可能重发。公开仓库的状态只有时间、方向和计数，无token/chat ID。
 
-HTTP错误不输出URL和响应体，避免Telegram URL中的token泄露。不要开启HTTP调试追踪。没有自动下单、交易账户密钥、付费模型或新建付费资源。后续任何付费服务均须单独获得用户明确批准。
+HTTP错误不输出URL和响应体，避免Telegram URL中的token泄露。不要开启HTTP调试追踪。没有自动下单、交易账户密钥、付费模型调用或新建付费资源。后续任何付费服务均须单独获得用户明确批准。
 
 ## 参考
 
