@@ -1,12 +1,8 @@
-## 自动调度修复状态（2026-10-21 22:25 UTC）
-
-原生GitHub定时未按计划触发；手动验收通过不等于稳定运行。已由仓库拥有者网页提交重新登记cron（每小时1、6…56分），增加last_analysis_at/run_id/trigger健康记录。用户已批准免费cron-job.org独立调度，接收端与EXTERNAL_SCHEDULER.md已准备；待用户登录服务并在GitHub完成创建短期令牌前的身份验证。独立调度尚未上线，尚未创建或传输新令牌。
-
 # CryptoBlower · OKX ETH-USDT 永续每5分钟候选提醒
 
-已按用户授权更换行情源：**OKX ETH-USDT-SWAP USDT本位永续**。它与Binance价格、成交量和信号可能不同。2026-10-21 GitHub Actions真实行情验收成功，读取5m/15m已收盘K线并计算指标；已启用免费云端测试，截止2026-10-24T22:00:00Z（多伦多10月24日18:00）；TELEGRAM_CHAT_ID已保存，正式工作流首次运行成功。没有付费AI、付费资源或自动下单。
+使用 **OKX ETH-USDT-SWAP USDT本位永续**公开行情，每5分钟筛选一次候选信号；只有符合规则的新候选才向 @CryptoBlower_bot 私聊发送提醒。行情和信号与Binance可能不同。没有自动下单，AI复核未启用，没有调用付费AI或创建付费资源。
 
-[云端行情成功记录](https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39681966463)：15项测试和真实dry-run通过。正式工作流中17项测试通过，保存的私聊接收人已验证，Telegram测试回执已确认，OKX行情和GitHub持久化状态正常。首次运行无新候选，按预期静默。\n\n[正式运行验收记录](https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39682890028)。每小时2、7…57分计划执行；GitHub可能延迟/丢失，不保证精确五分钟。到期脚本停止分析和候选通知；定时runner仍可能启动，彻底停用可在Actions禁用workflow或将MONITOR_ENABLED=false。人工启动workflow会额外发送配置测试回执，定时运行不会发送此回执。
+2026-10-25已修复外部调度：cron-job.org定时触发GitHub Actions，原生GitHub schedule保留为备用。当前试运行截止 **2026-10-28T22:00:00Z（多伦多10月28日18:00）**，届时外部任务停止，程序也停止分析和发送。调度短期令牌10月29日到期；续期或付费步骤须另行确认。已验证多伦多时间20:36、20:41连续两轮真实自动分析成功；当前无新候选，按规则静默。具体配置及验收见 [EXTERNAL_SCHEDULER.md](EXTERNAL_SCHEDULER.md)。免费调度和GitHub排队可能延迟，不承诺严格每300秒执行。
 
 ## 筛选规则
 
@@ -30,11 +26,11 @@ python3 monitor.py --demo
 python3 monitor.py --dry-run
 ```
 
-17项本地离线测试覆盖指标、双周期与保留的1m确认、已收盘筛选、断档/过期/NaN、去重/冷却/日上限、状态持久化和文件权限、GitHub条件更新、离线AI及密钥错误保护。OKX真实行情已在Actions成功；Telegram测试投递与首次正式运行已验收；尚未出现实际建仓候选。
+17项本地离线测试覆盖指标、双周期与保留的1m确认、已收盘筛选、断档/过期/NaN、去重/冷却/日上限、状态持久化和文件权限、GitHub条件更新、离线AI及密钥错误保护。OKX真实行情、Telegram测试投递和历史候选投递均已在Actions通过。自动调度的最新验收见上方链接。
 
 ## Telegram安全配置
 
-机器人 @CryptoBlower_bot。用户已发送/start，GitHub Secret名为 `TELEGRAM_CRYPTOBLOWER_TOKEN`，工作流将其映射为程序环境变量TELEGRAM_BOT_TOKEN。密钥不要发送到聊天、代码、Issue、日志或截图。还需要 `TELEGRAM_CHAT_ID` Secret。
+机器人 @CryptoBlower_bot。用户已发送/start，GitHub Secret名为 `TELEGRAM_CRYPTOBLOWER_TOKEN`，工作流将其映射为程序环境变量TELEGRAM_BOT_TOKEN。密钥不要发送到聊天、代码、Issue、日志或截图。`TELEGRAM_CHAT_ID` Secret也已配置并验证。以下步骤供重新部署时使用。
 
 推荐：Actions手动运行“Telegram private connection test”。它验证机器人为@CryptoBlower_bot，且过去24小时只有一个私聊发送/start时才发送一次连接测试，将chat ID仅发到该私聊，公开日志不包含token/ID。若零个或多个私聊候选则拒绝发送。将私聊里收到的数字直接存为TELEGRAM_CHAT_ID Secret，不在聊天或公开仓库粘贴。
 
@@ -42,7 +38,7 @@ python3 monitor.py --dry-run
 
 ## Actions五分钟部署
 
-仅允许独立公开仓库标准ubuntu-latest，私有仓库job跳过；不使用付费runner、artifact或cache。单次最长2分钟。配置Secrets如上；Variables为TRIAL_UNTIL（未来7天内）、BOOTSTRAP_STATE=false（仓库已初始化.state/state.json）、MONITOR_ENABLED=true（已启用）。工作流需要Contents写权限保存去重状态，不需要PAT或Binance账户密钥。到期脚本不发通知，但仍应禁用workflow或设MONITOR_ENABLED=false停止runner启动。
+仅允许独立公开仓库标准ubuntu-latest，私有仓库job跳过；不使用付费runner、artifact或cache。单次最长2分钟。配置Secrets如上；Variables为TRIAL_UNTIL（未来7天内）、BOOTSTRAP_STATE=false（仓库已初始化.state/state.json）、MONITOR_ENABLED=true（当前已启用）。分析工作流使用GITHUB_TOKEN的Contents写权限保存去重状态；外部调度另需单仓库、Actions读写的短期PAT，详见调度文档。不需要交易账户密钥。到期脚本不发通知，但仍应禁用workflow或设MONITOR_ENABLED=false停止runner启动。
 
 公开仓库标准runner目前免费；账户级预算未由本项目设置，用户需在Billing核实并设置可用的预算停止选项。通知上限不等于账单硬限额。理论5分钟每天288次、30天8640次，不能将私人仓库按此频率运行视作免费。
 
@@ -61,3 +57,4 @@ HTTP错误不输出URL和响应体，避免Telegram URL中的token泄露。不�
 - [Binance衍生品文档](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Kline-Candlestick-Data)
 - [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
 - [Actions真实行情失败记录](https://github.com/KiKiyo/ethusdt-alerts/actions/runs/39637113034)
+
